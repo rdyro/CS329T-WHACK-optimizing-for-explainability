@@ -64,7 +64,7 @@ class PyTorchDeep(Explainer):
             if outputs.shape[1] > 1:
                 self.multi_output = True
                 self.num_outputs = outputs.shape[1]
-            self.expected_value = outputs.mean(0).cpu().numpy()
+            self.expected_value = outputs.mean(0)
 
     def add_target_handle(self, layer):
         input_handle = layer.register_forward_hook(get_target_input)
@@ -112,7 +112,6 @@ class PyTorchDeep(Explainer):
         selected = [val for val in outputs[:, idx]]
         grads = []
         if self.interim:
-            raise NotImplementedError
             interim_inputs = self.layer.target_input
             for idx, input in enumerate(interim_inputs):
                 grad = torch.autograd.grad(
@@ -122,14 +121,13 @@ class PyTorchDeep(Explainer):
                     if idx + 1 < len(interim_inputs)
                     else None,
                     allow_unused=True,
+                    create_graph=True,
                 )[0]
-                if grad is not None:
-                    grad = grad.cpu().numpy()
-                else:
-                    grad = torch.zeros_like(X[idx]).cpu().numpy()
+                if grad is None:
+                    grad = torch.zeros_like(X[idx])
                 grads.append(grad)
             del self.layer.target_input
-            return grads, [i.detach().cpu().numpy() for i in interim_inputs]
+            return grads, interim_inputs
         else:
             for idx, x in enumerate(X):
                 grad = torch.autograd.grad(
@@ -139,11 +137,8 @@ class PyTorchDeep(Explainer):
                     allow_unused=True,
                     create_graph=True,
                 )[0]
-                if grad is not None:
-                    pass
-                    # grad = grad.cpu().numpy()
-                else:
-                    grad = torch.zeros_like(X[idx]).cpu().numpy()
+                if grad is None:
+                    grad = torch.zeros_like(X[idx])
                 grads.append(grad)
             return grads
 
@@ -204,7 +199,6 @@ class PyTorchDeep(Explainer):
             phis = []
             phis_ = []
             if self.interim:
-                raise NotImplementedError
                 for k in range(len(self.interim_inputs_shape)):
                     phis.append(
                         torch.zeros(
@@ -236,17 +230,12 @@ class PyTorchDeep(Explainer):
                 # run attribution computation graph
                 feature_ind = model_output_ranks[j, i]
                 sample_phis = self.gradient(feature_ind, joint_x)
-                sample_phis_ = [
-                    sample_phi.detach().cpu().numpy()
-                    for sample_phi in sample_phis
-                ]
                 # assign the attributions to the right part of the output arrays
                 if self.interim:
-                    raise NotImplementedError
                     sample_phis, output = sample_phis
                     x, data = [], []
                     for k in range(len(output)):
-                        x_temp, data_temp = np.split(output[k], 2)
+                        x_temp, data_temp = torch.split(output[k], 2)
                         x.append(x_temp)
                         data.append(data_temp)
                     for l in range(len(self.interim_inputs_shape)):
@@ -266,7 +255,6 @@ class PyTorchDeep(Explainer):
             handle.remove()
         self.remove_attributes(self.model)
         if self.interim:
-            raise NotImplementedError
             self.target_handle.remove()
 
         if not self.multi_output:
