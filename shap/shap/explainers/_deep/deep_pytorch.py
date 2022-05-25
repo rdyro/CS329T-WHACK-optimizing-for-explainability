@@ -6,6 +6,7 @@ from packaging import version
 
 torch = None
 
+METHODS_USED = set()
 
 class PyTorchDeep(Explainer):
     def __init__(self, model, data):
@@ -149,6 +150,8 @@ class PyTorchDeep(Explainer):
         output_rank_order="max",
         check_additivity=False,
     ):
+        global METHODS_USED
+        METHODS_USED = set()
 
         # X ~ self.model_input
         # X_data ~ self.data
@@ -197,7 +200,6 @@ class PyTorchDeep(Explainer):
         output_phis = []
         for i in range(model_output_ranks.shape[1]):
             phis = []
-            phis_ = []
             if self.interim:
                 for k in range(len(self.interim_inputs_shape)):
                     phis.append(
@@ -251,11 +253,12 @@ class PyTorchDeep(Explainer):
                         ).mean(0)
             output_phis.append(phis[0] if not self.multi_input else phis)
         # cleanup; remove all gradient handles
-        for handle in handles:
-            handle.remove()
-        self.remove_attributes(self.model)
-        if self.interim:
-            self.target_handle.remove()
+        #for handle in handles:
+        #    handle.remove()
+        #self.remove_attributes(self.model)
+        #if self.interim:
+        #    self.target_handle.remove()
+        #print(METHODS_USED)
 
         if not self.multi_output:
             return output_phis[0]
@@ -354,11 +357,13 @@ complex_module_gradients = []
 
 
 def passthrough(module, grad_input, grad_output):
+    METHODS_USED.add("passthrough")
     """No change made to gradients"""
     return None
 
 
 def maxpool(module, grad_input, grad_output):
+    METHODS_USED.add("maxpool")
     pool_to_unpool = {
         "MaxPool1d": torch.nn.functional.max_unpool1d,
         "MaxPool2d": torch.nn.functional.max_unpool2d,
@@ -417,11 +422,13 @@ def maxpool(module, grad_input, grad_output):
 
 
 def linear_1d(module, grad_input, grad_output):
+    METHODS_USED.add("linear_1d")
     """No change made to gradients."""
     return None
 
 
 def nonlinear_1d(module, grad_input, grad_output):
+    METHODS_USED.add("nonlinear_1d")
     delta_out = (
         module.y[: int(module.y.shape[0] / 2)]
         - module.y[int(module.y.shape[0] / 2) :]
@@ -436,7 +443,7 @@ def nonlinear_1d(module, grad_input, grad_output):
     # just taking the gradient in those cases
     grads = [None for _ in grad_input]
     grads[0] = torch.where(
-        torch.abs(delta_in.repeat(dup0)) < 1e-6,
+        torch.abs(delta_in.repeat(dup0)) < 1e-3,
         grad_input[0],
         grad_output[0] * (delta_out / delta_in).repeat(dup0),
     )
