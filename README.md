@@ -1,5 +1,7 @@
 # CS329T - Optimizing for explainability
 
+![logo](./media/project_logo.png)
+
 ### Guide to code
 
 `optimizing_for_explainability/` contains project code in python files
