@@ -1,10 +1,10 @@
 import pdb
-import numpy as np
+import numpy as np, torch
 import warnings
 from .._explainer import Explainer
 from packaging import version
 
-torch = None
+#torch = None
 
 METHODS_USED = set()
 
@@ -66,6 +66,7 @@ class PyTorchDeep(Explainer):
                 self.multi_output = True
                 self.num_outputs = outputs.shape[1]
             self.expected_value = outputs.mean(0)
+        self.handles = []
 
     def add_target_handle(self, layer):
         input_handle = layer.register_forward_hook(get_target_input)
@@ -106,6 +107,15 @@ class PyTorchDeep(Explainer):
                 except AttributeError:
                     pass
 
+    def cleanup(self):
+        # cleanup; remove all gradient handles
+        for handle in self.handles:
+            handle.remove()
+        self.remove_attributes(self.model)
+        if self.interim:
+            self.target_handle.remove()
+        self.handles = []
+
     def gradient(self, idx, inputs):
         self.model.zero_grad()
         X = [x.requires_grad_() for x in inputs]
@@ -118,9 +128,9 @@ class PyTorchDeep(Explainer):
                 grad = torch.autograd.grad(
                     selected,
                     input,
-                    retain_graph=True
-                    if idx + 1 < len(interim_inputs)
-                    else None,
+                    #retain_graph=True 
+                    #if idx + 1 < len(interim_inputs) else False,
+                    retain_graph=True,
                     allow_unused=True,
                     create_graph=True,
                 )[0]
@@ -134,7 +144,8 @@ class PyTorchDeep(Explainer):
                 grad = torch.autograd.grad(
                     selected,
                     x,
-                    retain_graph=True if idx + 1 < len(X) else None,
+                    #retain_graph=True if idx + 1 < len(X) else False,
+                    retain_graph=True,
                     allow_unused=True,
                     create_graph=True,
                 )[0]
@@ -190,7 +201,7 @@ class PyTorchDeep(Explainer):
                 * torch.arange(0, self.num_outputs).int()
             )
         # add the gradient handles
-        handles = self.add_handles(
+        self.handles = self.add_handles(
             self.model, add_interim_values, deeplift_grad
         )
         if self.interim:
@@ -314,13 +325,17 @@ def add_interim_values(module, input, output):
             if func_name in ["maxpool", "nonlinear_1d"]:
                 # only save tensors if necessary
                 if type(input) is tuple:
-                    setattr(module, "x", torch.nn.Parameter(input[0].detach()))
+                    #setattr(module, "x", torch.nn.Parameter(input[0].detach()))
+                    setattr(module, "x", input[0])
                 else:
-                    setattr(module, "x", torch.nn.Parameter(input.detach()))
+                    #setattr(module, "x", torch.nn.Parameter(input.detach()))
+                    setattr(module, "x", input)
                 if type(output) is tuple:
-                    setattr(module, "y", torch.nn.Parameter(output[0].detach()))
+                    #setattr(module, "y", torch.nn.Parameter(output[0].detach()))
+                    setattr(module, "y", output[0])
                 else:
-                    setattr(module, "y", torch.nn.Parameter(output.detach()))
+                    #setattr(module, "y", torch.nn.Parameter(output.detach()))
+                    setattr(module, "y", output)
             if module_type in failure_case_modules:
                 input[0].register_hook(deeplift_tensor_grad)
 
