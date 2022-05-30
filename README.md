@@ -15,3 +15,17 @@
 `scripts/` contains standalone scripts (e.g. figure generation)
 
 `./` contains jupyter notebooks for the project
+
+### TODO
+
+- [x] incorporate COMPAS dataset
+- [x] make a COMPAS model
+- [x] differentiate SHAP values
+- [x] optimize LIME values
+- [x] optimize SHAP values
+- [x] optimize for fairness (on the COMPAS dataset)
+- [ ] implement classical fairness metrics
+- [ ] implement classical explainability metrics
+- [ ] incorporate LUNG dataset
+- [ ] make a vision model
+- [ ] optimize for explainability (on the LUNG dataset)
