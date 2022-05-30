@@ -1,8 +1,8 @@
 # CS329T - Optimizing for explainability
 
-<center>
+<div align="center">
 <img src="./media/project_logo.png" width="50%" />
-</center>
+</div>
 
 ### Guide to code
 
