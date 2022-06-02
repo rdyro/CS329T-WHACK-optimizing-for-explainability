@@ -1,11 +1,13 @@
 import numpy as np
 from collections import namedtuple
-import pandas as pd 
+import pandas as pd
 
 """
 Function inspired by https://github.com/gpleiss/equalized_odds_and_calibration/blob/master/eq_odds.py
 """
-class Model(namedtuple('Model', 'pred label')):
+
+
+class Model(namedtuple("Model", "pred label")):
     def logits(self):
         raw_logits = np.clip(np.log(self.pred / (1 - self.pred)), -100, 100)
         return raw_logits
@@ -65,77 +67,117 @@ class Model(namedtuple('Model', 'pred label')):
         return self.pred[self.label == 0].mean()
 
     def accuracies(self):
-        return self.pred.round() == self.label        
+        return self.pred.round() == self.label
 
     def __repr__(self):
-        return '\n'.join([
-            'Accuracy:\t%.3f' % self.accuracy(),
-            'F.P. cost:\t%.3f' % self.fp_cost(),
-            'F.N. cost:\t%.3f' % self.fn_cost(),
-            'Base rate:\t%.3f' % self.base_rate(),
-            'Avg. score:\t%.3f' % self.pred.mean(),
-        ])
+        return "\n".join(
+            [
+                "Accuracy:\t%.3f" % self.accuracy(),
+                "F.P. cost:\t%.3f" % self.fp_cost(),
+                "F.N. cost:\t%.3f" % self.fn_cost(),
+                "Base rate:\t%.3f" % self.base_rate(),
+                "Avg. score:\t%.3f" % self.pred.mean(),
+            ]
+        )
 
-def eq_odds(group_0, group_1):
-    print('Equalized Odds')
-    print('Group 0 / Group 1 TP rate:\t%.3f \t / \t %.3f' % (group_0.tpr(), group_1.tpr()))
-    print('Group 0 / Group 1 TN rate:\t%.3f \t / \t %.3f' % (group_0.tnr(), group_1.tnr()))
-    print()
 
-def eq_opportunity(group_0, group_1):
-    print('Equality of Opportunity')
-    print('Group 0 / Group 1 TP rate:\t%.3f \t / \t %.3f' % (group_0.tpr(), group_1.tpr()))
+def eq_odds(groups):
+    print("Equalized Odds")
+    vals = [group.tnr() for group in groups]
+    print(
+        "Groups TP rate:"
+        + "\t".join([f"{group.tpr():.3f}" for group in groups])
+    )
+    print(
+        "Groups TN rate:"
+        + "\t".join([f"{val:.3f}" for val in vals])
+    )
     print()
+    return vals
 
-def dem_parity(group_0, group_1):
-    print('Demographic Parity')
-    print('Group 0 / Group 1 predicted positive rate:\t%.3f \t / \t %.3f' % (group_0.pred.mean(), group_1.pred.mean()))
-    print()
 
-def pred_parity(group_0, group_1):
-    print('Predictive Parity')
-    print('Group 0 / Group 1 precision:\t%.3f \t / \t %.3f' % (group_0.precision(), group_1.precision()))
+def eq_opportunity(groups):
+    print("Equality of Opportunity")
+    vals = [group.tpr() for group in groups]
+    print(
+        "Groups TP rate:"
+        + "\t".join([f"{val:.3f}" for val in vals])
+    )
     print()
+    return vals
 
-def accuracy_compare(group_0, group_1):
-    print('Accuracy')
-    print('Group 0 / Group 1 accuracy:\t%.3f \t / \t %.3f' % (group_0.accuracy(), group_1.accuracy()))
+
+def dem_parity(groups):
+    print("Demographic Parity")
+    vals = [group.pred.mean() for group in groups]
+    print(
+        "Group predicted positive rate:"
+        + "\t".join([f"{val:.3f}" for val in vals])
+    )
     print()
+    return vals
+
+
+def pred_parity(groups):
+    print("Predictive Parity")
+    vals = [group.precision() for group in groups]
+    print("Group precision :" + "\t".join([f"{val:3f}" for val in vals]))
+    print()
+    return vals
+
+
+def accuracy_compare(groups):
+    print("Accuracy")
+    vals = [group.accuracy() for group in groups]
+    print("Group accuracy:" + "\t".join([f"{val:3f}" for val in vals]))
+    print()
+    return vals
+
 
 """
 Computes desired fairness metric for a dataset with two groups.
 Inputs:
 metric: should be one of 'all', 'equalized_odds', 'equality_of_opportunity', 'demographic_parity', 'predictive_parity', 'accuracy'
-data_filename: should be a csv file that contains the following columns,
+data: should be a pandas dataframe.
 pred_col: default 'prediction' (a score between 0 and 1), 
 label_col: default 'label' (ground truth - either 0 or 1), 
-group_col: default 'group' (group assignment - either 0 or 1)
 """
-def fairness_metric(data_filename, metric = 'all', pred_col = 'prediction', label_col = 'label', group_col = 'group'):
-    data = pd.read_csv(data_filename, sep='\t')
-    group_0_data = data[data[group_col]==0]
-    group_1_data = data[data[group_col]==1]
-    group_0_model = Model(group_0_data[pred_col], group_0_data[label_col])
-    group_1_model = Model(group_1_data[pred_col], group_1_data[label_col])
-    if metric == 'equalized_odds':
-        eq_odds(group_0_model, group_1_model)
-    elif metric == 'equality_of_opportunity':
-        eq_opportunity(group_0_model, group_1_model)
-    elif metric == 'demographic_parity':
-        dem_parity(group_0_model, group_1_model)
-    elif metric == 'predictive_parity':
-        pred_parity(group_0_model, group_1_model)
-    elif metric == 'accuracy':
-        accuracy_compare(group_0_model, group_1_model)
-    elif metric == 'all':
-        accuracy_compare(group_0_model, group_1_model)
-        dem_parity(group_0_model, group_1_model)
-        pred_parity(group_0_model, group_1_model)
-        eq_opportunity(group_0_model, group_1_model)
-        eq_odds(group_0_model, group_1_model)
+
+
+def fairness_metric(
+    data,
+    group_idxs,
+    metric="all",
+    pred_col="prediction",
+    label_col="label",
+):
+    # data = pd.read_csv(data_filename, sep="\t")
+    groups_data = [data.loc[data[group_idx] == 1] for group_idx in group_idxs]
+    groups_model = [
+        Model(group_data[pred_col], group_data[label_col])
+        for group_data in groups_data
+    ]
+    if metric == "equalized_odds":
+        eq_odds(groups_model)
+    elif metric == "equality_of_opportunity":
+        eq_opportunity(groups_model)
+    elif metric == "demographic_parity":
+        dem_parity(groups_model)
+    elif metric == "predictive_parity":
+        pred_parity(groups_model)
+    elif metric == "accuracy":
+        accuracy_compare(groups_model)
+    elif metric == "all":
+        tnr = eq_odds(groups_model)
+        tpr = eq_opportunity(groups_model)
+        mean = dem_parity(groups_model)
+        prec = pred_parity(groups_model)
+        acc = accuracy_compare(groups_model)
+        return dict(tnr=tnr, tpr=tpr, mean=mean, prec=prec, acc=acc)
     else:
-        raise ValueError('Metric not recognized: %s' % metric)
+        raise ValueError("Metric not recognized: %s" % metric)
     return
 
-if __name__ == '__main__':
-    fairness_metric('./example.csv', metric='all')
+
+if __name__ == "__main__":
+    fairness_metric("./example.csv", metric="all")

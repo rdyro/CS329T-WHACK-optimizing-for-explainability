@@ -1,3 +1,4 @@
+data/*
 .lsp_symlink
 runs
 runs/* # tensorboard runs
